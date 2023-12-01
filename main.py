@@ -3,9 +3,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from termcolor import colored
 import csv
+import os
+from datetime import datetime
+
+DURATION_IN_SECONDS = 5
+CHART_X_MIN = 0
+CHART_X_MAX = 2000
 
 
-def capture_audio(seconds=10, sample_rate=44100, chunk_size=1024):
+def capture_audio(seconds=DURATION_IN_SECONDS, sample_rate=44100, chunk_size=1024):
     """
     Captures audio using the microphone.
 
@@ -52,7 +58,11 @@ def capture_audio(seconds=10, sample_rate=44100, chunk_size=1024):
         # Find the index of the maximum frequency
         index_max = np.argmax(spectrum)
         freq_max = frequencies[index_max]
-        amplitude_max = 20 * np.log10(spectrum[index_max] / np.max(spectrum))
+        amplitude_max = (
+            20 * np.log10(spectrum[index_max] / np.max(spectrum))
+            if np.max(spectrum) != 0
+            else 0
+        )
 
         # Store values
         hz_values.append(freq_max)
@@ -88,7 +98,9 @@ def plot_spectrum(frequencies, spectrum):
     plt.title("Frequency Spectrum")
     plt.xlabel("Frequency (Hz)")
     plt.ylabel("Amplitude (dB)")
-    plt.xlim(0, 2000)  # Set the x-axis limit to focus on relevant frequencies
+    plt.xlim(
+        CHART_X_MIN, CHART_X_MAX
+    )  # Set the x-axis limit to focus on relevant frequencies
     plt.ylim(-100, 0)  # Set the y-axis limit for dB values
     plt.show()
 
@@ -110,15 +122,20 @@ def identify_resonance(frequencies, spectrum):
     print(colored(f"Maximum amplitude: {amplitude_max} dB", "cyan"))
 
 
-def save_to_csv(filename, hz_values, db_values):
+def save_to_csv(hz_values, db_values):
     """
-    Saves frequency and amplitude data to a CSV file.
+    Saves frequency and amplitude data to a CSV file in the 'audios' folder.
 
     Parameters:
-    - filename (str): Name of the CSV file.
     - hz_values (list): List of frequency values.
     - db_values (list): List of amplitude values in decibels.
     """
+    if not os.path.exists('audios'):
+        os.makedirs('audios')
+
+    current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f'audios/audio_data_{current_time}.csv'
+
     with open(filename, mode="w", newline="") as file:
         writer = csv.writer(file)
         writer.writerow(["Frequency (Hz)", "Amplitude (dB)"])
@@ -136,7 +153,7 @@ if __name__ == "__main__":
     audio_data, hz_values, db_values = capture_audio(sample_rate=sample_rate)
 
     # Calculate frequency spectrum using Fast Fourier Transform (FFT)
-    frequencies = np.fft.fftfreq(len(audio_data), 1/sample_rate)
+    frequencies = np.fft.fftfreq(len(audio_data), 1 / sample_rate)
     spectrum = np.abs(np.fft.fft(audio_data))
 
     # Plot the spectrum
@@ -145,6 +162,6 @@ if __name__ == "__main__":
     # Identify resonance
     identify_resonance(frequencies, spectrum)
 
-    # Save data to CSV file
-    save_to_csv('audio_data.csv', hz_values, db_values)
 
+    # Save data to CSV file
+    save_to_csv(hz_values, spectrum)
